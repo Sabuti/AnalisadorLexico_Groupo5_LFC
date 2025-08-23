@@ -4,74 +4,94 @@
 
 #Implementar parseExpressao(std::string linha, std::vector<std::string>& _tokens_) (ou equivalente em Python/C) para analisar uma linha de expressão RPN e extrair tokens.
 def parseExpressao(linha, _tokens_):
-    tokens = linha.split()
-    for token in tokens:
+    operadores = ['+', '-', '*', '/', '(', ')', 'RES', 'MEN']
+    token = ""
+    parenteses = 0
+    i = 0
+
+    while i < len(linha):
+        char = linha[i]
+        # Espaços em branco
+        if char.isspace():
+            if token:
+                _tokens_.append(token)
+                token = ""
+        # Verifica os parenteses e se estão balanceados
+        elif char in "()":
+            if token:
+                _tokens_.append(token)
+                token = ""
+            _tokens_.append(char)
+            if char == "(":
+                parenteses += 1
+            else:
+                parenteses -= 1
+                if parenteses < 0:
+                    raise ValueError("Erro: parêntese fechado sem correspondente.")
+
+        # Operadores
+        elif char in "+-*/":
+            if token:
+                _tokens_.append(token)
+                token = ""
+            _tokens_.append(char)
+
+        # Possível palavras RES ou MEN
+        else:
+            token += char
+
+        i += 1
+
+    if token:
         _tokens_.append(token)
+
+    # Verificação final dos parênteses
+    if parenteses != 0:
+        raise ValueError("Erro: faltam parênteses")
+
+    # Validação dos tokens
+    for t in _tokens_:
+        if t not in operadores:  # se não for operador/parêntese
+            try:
+                float(t)  # tenta converter pra número
+            except ValueError:
+                raise ValueError(f"Erro: token inválido '{t}'")
+
     return True
 
-#Implementar bool isOperador(std::string token) (ou equivalente em Python/C) para verificar se um token é um operador válido (+, -, *, /).
-def isOperador(token):
-    operadores_validos = ['+', '-', '*', '/']
-    return token in operadores_validos
-
-#Implementar o analisador léxico usando Autômatos Finitos Determinísticos (AFDs), com cada estado como uma função (ex.: estadoNumero, estadoOperador, estadoParenteses).
-def estadoNumero(caractere):
-    return caractere.isdigit()
-def estadoOperador(caractere):
-    return caractere in ['+', '-', '*', '/']
-def estadoParenteses(caractere):
-    return caractere in ['(', ')']
-def analisadorLexico(linha):
-    tokens = []
-    i = 0
-    while i < len(linha):
-        caractere = linha[i]
-        if caractere.isspace():
-            i += 1
-            continue
-        elif estadoNumero(caractere):
-            num = ''
-            while i < len(linha) and estadoNumero(linha[i]):
-                num += linha[i]
-                i += 1
-            tokens.append(num)
-        elif estadoOperador(caractere):
-            tokens.append(caractere)
-            i += 1
-        elif estadoParenteses(caractere):
-            tokens.append(caractere)
-            i += 1
+#Implementado o analisador léxico que recebe os tokens extraídos por parseExpressao e imprime cada token com seu tipo.
+def analisadorLexico(tokens): 
+    operadores = {'+': 'Operador de Adição', 
+                  '-': 'Operador de Subtração', 
+                  '*': 'Operador de Multiplicação', 
+                  '/': 'Operador de Divisão', 
+                  '(': 'Parêntese Aberto', 
+                  ')': 'Parêntese Fechado', 
+                  'RES': 'Operador RES',
+                  'MEN': 'Operador Memoria'}
+    for token in tokens:
+        if token in operadores:
+            print(f"Token: {token}, Tipo: {operadores[token]}")
         else:
-            raise ValueError(f"Caractere inválido: {caractere}")
-    return tokens
-
-#Implementar a função principal que lê um arquivo de entrada, processa cada linha com parseExpressao, valida os tokens com isOperador e usa o analisador léxico para extrair tokens.
-def main():
-    arquivo_entrada = 'arquivo_teste.txt'
-    with open(arquivo_entrada, 'r') as f:
-        linhas = f.readlines()
-    
-    for linha in linhas:
-        linha = linha.strip()
-        if not linha:
-            continue
-        tokens = []
-        if parseExpressao(linha, tokens):
-            print(f"Linha: {linha}")
-            print(f"Tokens: {tokens}")
-            for token in tokens:
-                if isOperador(token):
-                    print(f"'{token}' é um operador válido.")
-                else:
-                    print(f"'{token}' não é um operador.")
-            print("Analisador Léxico:")
             try:
-                lex_tokens = analisadorLexico(linha)
-                print(f"Tokens extraídos: {lex_tokens}")
-            except ValueError as e:
-                print(e)
-        else:
-            print(f"Erro ao analisar a linha: {linha}")
+                float(token)
+                print(f"Token: {token}, Tipo: Número")
+            except ValueError:
+                print(f"Token: {token}, Tipo: Identificador")
+
+#implementado o main que lê o arquivo_teste.txt, chama parseExpressao e depois analisadorLexico.
+def main():
+    arquivo_teste = 'arquivo_teste.txt'
+    with open(arquivo_teste, 'r') as file:
+        for linha in file:
+            linha = linha.strip()
+            if linha:  # Ignorar linhas vazias
+                tokens = []
+                try:
+                    parseExpressao(linha, tokens)
+                    analisadorLexico(tokens)
+                except ValueError as e:
+                    print(e)
 
 if __name__ == "__main__":
     main()
