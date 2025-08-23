@@ -79,9 +79,70 @@ def analisadorLexico(tokens):
             except ValueError:
                 print(f"Token: {token}, Tipo: Identificador")
 
+def executarExpressao(tokens, resultados, memoria):
+    pilha = []
+    i = 0
+    comando_puro = False  # marca se expressão foi só comando (ex: V MEM)
+    comando_res  = False  # marca se expressão foi res (ex: N RES)
+
+    while i < len(tokens):
+        token = tokens[i]
+        if token == '(' or token == ')':
+            i += 1 # pular parênteses
+            continue
+        if len(tokens) == 3: # recebeu o nome da memoria
+            if memoria is None:
+                pilha.append(0)
+            else:
+                pilha.append(float(memoria))
+            comando_puro = True
+        elif len(tokens) == 4 and tokens[i + 1] == 'RES': # recebeu (N RES)
+            n = int(token)
+            comando_res = True
+            i += 1  # pular "RES"
+        elif len(tokens) == 4 and tokens[i + 1] != 'RES': # recebeu (N MEM)
+            n = float(token)
+            memoria.update({tokens[i+1]: n})
+            comando_puro = True
+            i += 1  # pular nome da memoria
+        else: # Recebeu expressão matemática
+            if token not in {"+", "-", "*", "/", "%", "^"}: # se não for operador
+                pilha.append(float(token))
+            else: # se for operador
+                b = pilha.pop()
+                a = pilha.pop()
+                if token == "+": res = a + b
+                elif token == "-": res = a - b
+                elif token == "*": res = a * b
+                elif token == "/":
+                    if b == 0: raise ZeroDivisionError("Divisão por zero")
+                    res = a / b
+                elif token == "%":
+                    if b == 0: raise ZeroDivisionError("Resto por zero")
+                    res = a % b
+                elif token == "^": res = a ** b
+                pilha.append(float(res))
+        i += 1
+
+    # --- Verificação final ---
+    if comando_puro:
+        return memoria
+    elif comando_res:
+        if n < 0 or n >= len(resultados):
+            raise ValueError(f"Histórico inválido: {n}")
+        return resultados[-(n)]
+    elif len(pilha) == 1:
+        resultado = pilha.pop()
+        resultados.append(resultado)
+        return resultado
+    else:
+        raise ValueError("Expressão inválida (sobraram itens na pilha)")
+
 #implementado o main que lê o arquivo_teste.txt, chama parseExpressao e depois analisadorLexico.
 def main():
     arquivo_teste = 'arquivo_teste.txt'
+    memoria = {}
+    resultados = []
     with open(arquivo_teste, 'r') as file:
         for linha in file:
             linha = linha.strip()
@@ -90,6 +151,7 @@ def main():
                 try:
                     parseExpressao(linha, tokens)
                     analisadorLexico(tokens)
+                    print(executarExpressao(tokens, resultados, memoria))
                 except ValueError as e:
                     print(e)
 
