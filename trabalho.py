@@ -82,8 +82,9 @@ def analisadorLexico(tokens):
 def executarExpressao(tokens, resultados, memoria):
     pilha = []
     i = 0
-    comando_puro = False  # marca se expressão foi só comando (ex: V MEM)
+    comand_mem = False  # marca se expressão foi só comando (ex: MEM)
     comando_res  = False  # marca se expressão foi res (ex: N RES)
+    comand_other = False  # marca se expressão foi de memoria (ex: N MEM)
 
     while i < len(tokens):
         token = tokens[i]
@@ -91,11 +92,11 @@ def executarExpressao(tokens, resultados, memoria):
             i += 1 # pular parênteses
             continue
         if len(tokens) == 3: # recebeu o nome da memoria
-            if memoria is None:
-                pilha.append(0)
+            if token not in memoria:
+                raise ValueError(f"Memória inválida: {token}")
             else:
-                pilha.append(float(memoria))
-            comando_puro = True
+                pilha.append(memoria[token])
+            comand_mem = True
         elif len(tokens) == 4 and tokens[i + 1] == 'RES': # recebeu (N RES)
             n = int(token)
             comando_res = True
@@ -103,7 +104,7 @@ def executarExpressao(tokens, resultados, memoria):
         elif len(tokens) == 4 and tokens[i + 1] != 'RES': # recebeu (N MEM)
             n = float(token)
             memoria.update({tokens[i+1]: n})
-            comando_puro = True
+            comand_other = True
             i += 1  # pular nome da memoria
         else: # Recebeu expressão matemática
             if token not in {"+", "-", "*", "/", "%", "^"}: # se não for operador
@@ -124,17 +125,20 @@ def executarExpressao(tokens, resultados, memoria):
                 pilha.append(float(res))
         i += 1
 
-    # --- Verificação final ---
-    if comando_puro:
-        return memoria
+    # --- Verificação e returns ---
+    if comand_mem:
+        memory_value = pilha.pop()
+        return memory_value
     elif comando_res:
         if n < 0 or n >= len(resultados):
             raise ValueError(f"Histórico inválido: {n}")
         return resultados[-(n)]
+    elif comand_other:
+        return memoria
     elif len(pilha) == 1:
-        resultado = pilha.pop()
-        resultados.append(resultado)
-        return resultado
+        result = pilha.pop()
+        resultados.append(result)
+        return result
     else:
         raise ValueError("Expressão inválida (sobraram itens na pilha)")
 
