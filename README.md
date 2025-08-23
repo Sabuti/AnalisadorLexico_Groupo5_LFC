@@ -7,8 +7,8 @@ Professor: Frank Coelho de Alcantara;
 Instituição: PUC-PR (Câmpus: Curitiba);
 
 Divisão de tarefas (inicial):
-Aluno 1 (parseExpressao) - Lucas;
-Aluno 2 (executarExpressao) - Ana Maria;
+Aluno 1 (parseExpressao) -  Ana Maria;
+Aluno 2 (executarExpressao) -Lucas;
 Aluno 3 (gerarAssembly) - Lucas;
 Aluno 4 (exibirResultados) - Ana Maria;
 
