@@ -44,3 +44,34 @@ def analisadorLexico(linha):
         else:
             raise ValueError(f"Caractere inválido: {caractere}")
     return tokens
+
+#Implementar a função principal que lê um arquivo de entrada, processa cada linha com parseExpressao, valida os tokens com isOperador e usa o analisador léxico para extrair tokens.
+def main():
+    arquivo_entrada = 'arquivo_teste.txt'
+    with open(arquivo_entrada, 'r') as f:
+        linhas = f.readlines()
+    
+    for linha in linhas:
+        linha = linha.strip()
+        if not linha:
+            continue
+        tokens = []
+        if parseExpressao(linha, tokens):
+            print(f"Linha: {linha}")
+            print(f"Tokens: {tokens}")
+            for token in tokens:
+                if isOperador(token):
+                    print(f"'{token}' é um operador válido.")
+                else:
+                    print(f"'{token}' não é um operador.")
+            print("Analisador Léxico:")
+            try:
+                lex_tokens = analisadorLexico(linha)
+                print(f"Tokens extraídos: {lex_tokens}")
+            except ValueError as e:
+                print(e)
+        else:
+            print(f"Erro ao analisar a linha: {linha}")
+
+if __name__ == "__main__":
+    main()
