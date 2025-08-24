@@ -2,8 +2,9 @@
 # Lucas Antonio Linhares - Sabuti
 # RA1 5
 
-#Implementar parseExpressao(std::string linha, std::vector<std::string>& _tokens_) (ou equivalente em Python/C) para analisar uma linha de expressão RPN e extrair tokens.
-import os
+import os # import para gerenciar arquivos
+import sys # import para gerenciar argumentos de linha de comando
+
 #Implementar parseExpressao(std::string linha, std::vector<std::string>& _tokens_) (ou equivalente em Python/C) para analisar uma linha de expressão RPN e extrair tokens.
 def parseExpressao(linha, _tokens_): 
     token = ""
@@ -89,7 +90,7 @@ def executarExpressao(tokens, resultados, memoria):
             continue
         if len(tokens) == 3: # recebeu o nome da memoria
             if token not in memoria:
-                raise ValueError(f"Memória inválida: {token}")
+                pilha.append(0.0)  # valor padrão se não existir
             else:
                 pilha.append(memoria[token])
             comand_mem = True
@@ -140,6 +141,7 @@ def executarExpressao(tokens, resultados, memoria):
 
 #implementado o main que lê o arquivo_teste.txt, chama parseExpressao e depois analisadorLexico.
 def main():
+    #arquivo_teste = sys.argv[0] teste
     arquivo_teste = 'arquivo_teste.txt'
     memoria = {}
     resultados = []
