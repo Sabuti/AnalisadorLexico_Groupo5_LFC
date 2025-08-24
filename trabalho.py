@@ -3,21 +3,22 @@
 # RA1 5
 
 #Implementar parseExpressao(std::string linha, std::vector<std::string>& _tokens_) (ou equivalente em Python/C) para analisar uma linha de expressão RPN e extrair tokens.
-def parseExpressao(linha, _tokens_):
-    operadores = ['+', '-', '*', '/', '(', ')', 'RES', 'MEN']
+import os
+#Implementar parseExpressao(std::string linha, std::vector<std::string>& _tokens_) (ou equivalente em Python/C) para analisar uma linha de expressão RPN e extrair tokens.
+def parseExpressao(linha, _tokens_): 
     token = ""
     parenteses = 0
     i = 0
-
     while i < len(linha):
         char = linha[i]
-        # Espaços em branco
-        if char.isspace():
+        if char =="$":
+            i += 1
+            break
+        elif char.isspace():# Ignorar espaços
             if token:
                 _tokens_.append(token)
                 token = ""
-        # Verifica os parenteses e se estão balanceados
-        elif char in "()":
+        elif char in "()":# Tratamento de parênteses
             if token:
                 _tokens_.append(token)
                 token = ""
@@ -28,47 +29,42 @@ def parseExpressao(linha, _tokens_):
                 parenteses -= 1
                 if parenteses < 0:
                     raise ValueError("Erro: parêntese fechado sem correspondente.")
-
-        # Operadores
-        elif char in "+-*/":
+        elif char in "+-*/%^": # Tratamento de operadores
             if token:
                 _tokens_.append(token)
                 token = ""
             _tokens_.append(char)
-
-        # Possível palavras RES ou MEN
-        else:
+        else: # Acúmulo de token (pode ser número ou identificador)
             token += char
-
         i += 1
-
     if token:
         _tokens_.append(token)
-
-    # Verificação final dos parênteses
-    if parenteses != 0:
-        raise ValueError("Erro: faltam parênteses")
-
-    # Validação dos tokens
-    for t in _tokens_:
-        if t not in operadores:  # se não for operador/parêntese
-            try:
-                float(t)  # tenta converter pra número
-            except ValueError:
-                raise ValueError(f"Erro: token inválido '{t}'")
-
+    if parenteses != 0:# Verificação final dos parênteses
+        raise ValueError("Erro: parênteses desbalanceados.")
     return True
 
 #Implementado o analisador léxico que recebe os tokens extraídos por parseExpressao e imprime cada token com seu tipo.
 def analisadorLexico(tokens): 
+    operadores_valida = ['+', '-', '*', '/', '%','^' ,'(', ')', 'RES']  
+    for t in tokens:# Validação dos tokens
+        if t not in operadores_valida and t not in ["(", ")"]:  
+            # Testa número
+            try:
+                float(t)
+            except ValueError:
+                # Se não for número, tem que ser identificador válido (apenas maiúsculas)
+                if not (t.isalpha() and t.isupper()):
+                    raise ValueError(f"Erro: token inválido '{t}'")
     operadores = {'+': 'Operador de Adição', 
                   '-': 'Operador de Subtração', 
                   '*': 'Operador de Multiplicação', 
                   '/': 'Operador de Divisão', 
+                  '%': 'Operador de Resto', 
+                  '^': 'Operador de Potenciação', 
                   '(': 'Parêntese Aberto', 
                   ')': 'Parêntese Fechado', 
-                  'RES': 'Operador RES',
-                  'MEN': 'Operador Memoria'}
+                  'RES': 'RES',
+                  'MEM': 'Memoria'}
     for token in tokens:
         if token in operadores:
             print(f"Token: {token}, Tipo: {operadores[token]}")
@@ -77,7 +73,7 @@ def analisadorLexico(tokens):
                 float(token)
                 print(f"Token: {token}, Tipo: Número")
             except ValueError:
-                print(f"Token: {token}, Tipo: Identificador")
+                print(f"Token: {token}, Tipo: Memoria")
 
 def executarExpressao(tokens, resultados, memoria):
     pilha = []
@@ -148,6 +144,8 @@ def main():
     memoria = {}
     resultados = []
     with open(arquivo_teste, 'r') as file:
+        if os.path.getsize(arquivo_teste) == 0:
+            print(f"O arquivo '{arquivo_teste}' está vazio.")
         for linha in file:
             linha = linha.strip()
             if linha:  # Ignorar linhas vazias
