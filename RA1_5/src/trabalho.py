@@ -63,3 +63,41 @@ def parseExpressao(linha, _tokens_):
         raise ValueError("Erro: parênteses desbalanceados.")
     return True
 
+
+# Implementado o analisador léxico que recebe os tokens extraídos por parseExpressao e 
+# imprime cada token com seu tipo.
+def analisadorLexico(tokens): 
+    operadores_valida = ['+', '-', '*', '/', '%','^' ,'(', ')', 'RES']  
+    for t in tokens:# Validação dos tokens
+        if t not in operadores_valida and t not in ["(", ")"]:  
+            # Testa número
+            try:
+                float(t)
+            except ValueError:
+                # Se não for número, tem que ser identificador válido (apenas maiúsculas)
+                if not (t.isalpha() and t.isupper()):
+                    return False  # indica que deu erro
+    """ --- Código de debug ---
+    operadores = {'+': 'Operador de Adição', 
+                  '-': 'Operador de Subtração', 
+                  '*': 'Operador de Multiplicação', 
+                  '/': 'Operador de Divisão', 
+                  '%': 'Operador de Resto', 
+                  '^': 'Operador de Potenciação', 
+                  '(': 'Parêntese Aberto', 
+                  ')': 'Parêntese Fechado', 
+                  'RES': 'RES',
+                  'MEM': 'Memoria'}
+    
+    for token in tokens:
+        if token in operadores:
+            print(f"Token: {token}, Tipo: {operadores[token]}")
+        else:
+            try:
+                float(token)
+                print(f"Token: {token}, Tipo: Número")
+            except ValueError:
+                print(f"Token: {token}, Tipo: Memoria")
+    """
+    return True
+
