@@ -2,10 +2,27 @@
 # Lucas Antonio Linhares - Sabuti
 # RA1 5
 
-import os # import para gerenciar arquivos
 import sys # import para gerenciar argumentos de linha de comando
 
-#Implementar parseExpressao(std::string linha, std::vector<std::string>& _tokens_) (ou equivalente em Python/C) para analisar uma linha de expressão RPN e extrair tokens.
+# Implementar lerArquivo(std::string nomeArquivo, std::vector<std::string>& linhas) 
+# para ler o arquivo de entrada;
+def lerArquivo(nomeArquivo, linhas):
+    try:
+        with open(nomeArquivo, 'r') as file:
+            for linha in file:
+                linha = linha.strip()
+                if linha:  # Ignorar linhas vazias
+                    linhas.append(linha)
+    except FileNotFoundError:
+        print(f"Erro: arquivo '{nomeArquivo}' não encontrado.")
+        return
+    except Exception as e:
+        print(f"Erro ao ler o arquivo: {e}")
+        return
+    return linhas
+
+# Implementar parseExpressao(std::string linha, std::vector<std::string>& _tokens_) 
+# (ou equivalente em Python/C) para analisar uma linha de expressão RPN e extrair tokens.
 def parseExpressao(linha, _tokens_): 
     token = ""
     parenteses = 0
@@ -44,7 +61,8 @@ def parseExpressao(linha, _tokens_):
         raise ValueError("Erro: parênteses desbalanceados.")
     return True
 
-#Implementado o analisador léxico que recebe os tokens extraídos por parseExpressao e imprime cada token com seu tipo.
+# Implementado o analisador léxico que recebe os tokens extraídos por parseExpressao e 
+# imprime cada token com seu tipo.
 def analisadorLexico(tokens): 
     operadores_valida = ['+', '-', '*', '/', '%','^' ,'(', ')', 'RES']  
     for t in tokens:# Validação dos tokens
@@ -55,7 +73,8 @@ def analisadorLexico(tokens):
             except ValueError:
                 # Se não for número, tem que ser identificador válido (apenas maiúsculas)
                 if not (t.isalpha() and t.isupper()):
-                    raise ValueError(f"Erro: token inválido '{t}'")
+                    return False  # indica que deu erro
+    """ --- Código de debug ---
     operadores = {'+': 'Operador de Adição', 
                   '-': 'Operador de Subtração', 
                   '*': 'Operador de Multiplicação', 
@@ -66,7 +85,7 @@ def analisadorLexico(tokens):
                   ')': 'Parêntese Fechado', 
                   'RES': 'RES',
                   'MEM': 'Memoria'}
-    """ --- Código de debug ---
+    
     for token in tokens:
         if token in operadores:
             print(f"Token: {token}, Tipo: {operadores[token]}")
@@ -79,36 +98,41 @@ def analisadorLexico(tokens):
     """
     return True
 
-def executarExpressao(tokens, resultados, memoria):
+# Implementar executarExpressao(const std::vector<std::string>& _tokens_, 
+# std::vector<float>& resultados, float& memoria) para executar uma expressão RPN;
+def executarExpressao(_tokens_, resultados, memoria):
     pilha = []
     i = 0
     comand_mem = False  # marca se expressão foi só comando (ex: MEM)
     comando_res  = False  # marca se expressão foi res (ex: N RES)
     comand_other = False  # marca se expressão foi de memoria (ex: N MEM)
 
-    while i < len(tokens):
-        token = tokens[i]
+    while i < len(_tokens_):
+        token = _tokens_[i]
         if token == '(' or token == ')':
             i += 1 # pular parênteses
             continue
-        if len(tokens) == 3: # recebeu o nome da memoria
+        if len(_tokens_) == 3: # recebeu o nome da memoria
             if token not in memoria:
                 pilha.append(0.0)  # valor padrão se não existir
             else:
                 pilha.append(memoria[token])
             comand_mem = True
-        elif len(tokens) == 4 and tokens[i + 1] == 'RES': # recebeu (N RES)
+        elif len(_tokens_) == 4 and _tokens_[i + 1] == 'RES': # recebeu (N RES)
             n = int(token)
             comando_res = True
             i += 1  # pular "RES"
-        elif len(tokens) == 4 and tokens[i + 1] != 'RES': # recebeu (N MEM)
+        elif len(_tokens_) == 4 and _tokens_[i + 1] != 'RES': # recebeu (N MEM)
             n = float(token)
-            memoria.update({tokens[i+1]: n})
+            memoria.update({_tokens_[i+1]: n})
             comand_other = True
             i += 1  # pular nome da memoria
         else: # Recebeu expressão matemática
             if token not in {"+", "-", "*", "/", "%", "^"}: # se não for operador
-                pilha.append(float(token))
+                try:
+                    pilha.append(float(token))
+                except ValueError:
+                    return ValueError(f"Token inválido recebido")
             else: # se for operador
                 b = pilha.pop()
                 a = pilha.pop()
@@ -135,17 +159,19 @@ def executarExpressao(tokens, resultados, memoria):
         return resultados[-(n)]
     elif comand_other:
         return memoria
+    elif len(pilha) == 0:
+        return ValueError("Comentário lido")
     elif len(pilha) == 1:
         result = pilha.pop()
         resultados.append(result)
         return result
     else:
         raise ValueError("Expressão inválida (sobraram itens na pilha)")
-    
-def apresenta_resultado(linha, resultados, memoria):
+
+# Implementar exibirResultados(const std::vector<float>& resultados) para exibir 
+# os resultados das expressões;    
+def exibirResultados(linha, resultados, memoria):
     try:
-        if len(linha) == 0:
-            return
         tokens = []
         parseExpressao(linha, tokens)
         if len(tokens) == 3:  # Comando de memória (ex: VAR)
@@ -164,26 +190,20 @@ def apresenta_resultado(linha, resultados, memoria):
     except ValueError as e:
         print(e)
 
-#implementado o main que lê o arquivo_teste.txt, chama parseExpressao e depois analisadorLexico.
-def main():
-    #arquivo_teste = sys.argv[0] teste
-    arquivo_teste = '../AnalisadorLexico_Groupo5_LFC/arquivo_teste.txt'
-    memoria = {}
-    resultados = []
-    with open(arquivo_teste, 'r') as file:
-        if os.path.getsize(arquivo_teste) == 0:
-            print(f"O arquivo '{arquivo_teste}' está vazio.")
-        for linha in file:
-            linha = linha.strip()
-            if linha:  # Ignorar linhas vazias
-                tokens = []
-                try:
-                    parseExpressao(linha, tokens)
-                    analisadorLexico(tokens)
-                    executarExpressao(tokens, resultados, memoria)
-                    apresenta_resultado(linha,resultados, memoria)
-                except ValueError as e:
-                    print(e)
-
+#implementado o main que lê o arquivo_teste.txt, chama parseExpressao e depois 
+# analisadorLexico.
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) < 2:
+        print("Uso: python script.py <nome_do_arquivo>")
+    else:
+        linhas = []
+        memoria = {}
+        resultados = []
+        caminho = sys.argv[1]
+        lerArquivo(caminho, linhas)
+        for linha in linhas:
+            tokens = []
+            parseExpressao(linha, tokens)
+            analisadorLexico(tokens)
+            executarExpressao(tokens, resultados, memoria)
+            exibirResultados(linha, resultados, memoria)
