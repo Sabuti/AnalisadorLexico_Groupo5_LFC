@@ -66,6 +66,7 @@ def analisadorLexico(tokens):
                   ')': 'Parêntese Fechado', 
                   'RES': 'RES',
                   'MEM': 'Memoria'}
+    """ --- Código de debug ---
     for token in tokens:
         if token in operadores:
             print(f"Token: {token}, Tipo: {operadores[token]}")
@@ -75,6 +76,8 @@ def analisadorLexico(tokens):
                 print(f"Token: {token}, Tipo: Número")
             except ValueError:
                 print(f"Token: {token}, Tipo: Memoria")
+    """
+    return True
 
 def executarExpressao(tokens, resultados, memoria):
     pilha = []
@@ -138,11 +141,33 @@ def executarExpressao(tokens, resultados, memoria):
         return result
     else:
         raise ValueError("Expressão inválida (sobraram itens na pilha)")
+    
+def apresenta_resultado(linha, resultados, memoria):
+    try:
+        if len(linha) == 0:
+            return
+        tokens = []
+        parseExpressao(linha, tokens)
+        if len(tokens) == 3:  # Comando de memória (ex: VAR)
+            valor_memoria = executarExpressao(tokens, resultados, memoria)
+            print(f"Valor na memória '{tokens[1]}': {valor_memoria}")
+        elif len(tokens) == 4 and tokens[2] == 'RES':  # Comando RES (ex: N RES)
+            n = int(tokens[1])
+            valor_res = executarExpressao(tokens, resultados, memoria)
+            print(f"Resultado RES {n}: {valor_res}")
+        elif len(tokens) == 4 and tokens[2] != 'RES':  # Comando MEM (ex: N MEM)
+            executarExpressao(tokens, resultados, memoria)
+            print(f"Valor '{tokens[1]}' armazenado na memória '{tokens[2]}'")
+        else:  # Expressão matemática
+            resultado = executarExpressao(tokens, resultados, memoria)
+            print(f"Resultado da expressão '{linha}': {resultado}")
+    except ValueError as e:
+        print(e)
 
 #implementado o main que lê o arquivo_teste.txt, chama parseExpressao e depois analisadorLexico.
 def main():
     #arquivo_teste = sys.argv[0] teste
-    arquivo_teste = 'arquivo_teste.txt'
+    arquivo_teste = '../AnalisadorLexico_Groupo5_LFC/arquivo_teste.txt'
     memoria = {}
     resultados = []
     with open(arquivo_teste, 'r') as file:
@@ -155,7 +180,8 @@ def main():
                 try:
                     parseExpressao(linha, tokens)
                     analisadorLexico(tokens)
-                    print(executarExpressao(tokens, resultados, memoria))
+                    executarExpressao(tokens, resultados, memoria)
+                    apresenta_resultado(linha,resultados, memoria)
                 except ValueError as e:
                     print(e)
 
