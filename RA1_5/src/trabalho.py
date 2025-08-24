@@ -1,6 +1,7 @@
 # Ana Maria Midori Rocha Hinoshita - anamariamidori
 # Lucas Antonio Linhares - Sabuti
 # RA1 5
+#teste
 
 import sys # import para gerenciar argumentos de linha de comando
 
