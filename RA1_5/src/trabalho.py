@@ -21,3 +21,45 @@ def lerArquivo(nomeArquivo, linhas):
         print(f"Erro ao ler o arquivo: {e}")
         return
     return linhas
+
+
+# Implementar parseExpressao(std::string linha, std::vector<std::string>& _tokens_) 
+# (ou equivalente em Python/C) para analisar uma linha de expressão RPN e extrair tokens.
+def parseExpressao(linha, _tokens_): 
+    token = ""
+    parenteses = 0
+    i = 0
+    while i < len(linha):
+        char = linha[i]
+        if char =="$":
+            i += 1
+            break
+        elif char.isspace():# Ignorar espaços
+            if token:
+                _tokens_.append(token)
+                token = ""
+        elif char in "()":# Tratamento de parênteses
+            if token:
+                _tokens_.append(token)
+                token = ""
+            _tokens_.append(char)
+            if char == "(":
+                parenteses += 1
+            else:
+                parenteses -= 1
+                if parenteses < 0:
+                    raise ValueError("Erro: parêntese fechado sem correspondente.")
+        elif char in "+-*/%^": # Tratamento de operadores
+            if token:
+                _tokens_.append(token)
+                token = ""
+            _tokens_.append(char)
+        else: # Acúmulo de token (pode ser número ou identificador)
+            token += char
+        i += 1
+    if token:
+        _tokens_.append(token)
+    if parenteses != 0:# Verificação final dos parênteses
+        raise ValueError("Erro: parênteses desbalanceados.")
+    return True
+
