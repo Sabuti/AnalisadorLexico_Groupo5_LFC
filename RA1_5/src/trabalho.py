@@ -101,3 +101,40 @@ def analisadorLexico(tokens):
     """
     return True
 
+def exibirResultados(linha, resultados, memoria):
+    try:
+        tokens = []
+        parseExpressao(linha, tokens)
+        if len(tokens) == 3:  # Comando de memória (ex: VAR)
+            valor_memoria = executarExpressao(tokens, resultados, memoria)
+            print(f"Valor na memória '{tokens[1]}': {valor_memoria}")
+        elif len(tokens) == 4 and tokens[2] == 'RES':  # Comando RES (ex: N RES)
+            n = int(tokens[1])
+            valor_res = executarExpressao(tokens, resultados, memoria)
+            print(f"Resultado RES {n}: {valor_res}")
+        elif len(tokens) == 4 and tokens[2] != 'RES':  # Comando MEM (ex: N MEM)
+            executarExpressao(tokens, resultados, memoria)
+            print(f"Valor '{tokens[1]}' armazenado na memória '{tokens[2]}'")
+        else:  # Expressão matemática
+            resultado = executarExpressao(tokens, resultados, memoria)
+            print(f"Resultado da expressão '{linha}': {resultado}")
+    except ValueError as e:
+        print(e)
+
+#implementado o main que lê o arquivo_teste.txt, chama parseExpressao e depois 
+# analisadorLexico.
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Uso: python script.py <nome_do_arquivo>")
+    else:
+        linhas = []
+        memoria = {}
+        resultados = []
+        caminho = sys.argv[1]
+        lerArquivo(caminho, linhas)
+        for linha in linhas:
+            tokens = []
+            parseExpressao(linha, tokens)
+            analisadorLexico(tokens)
+            executarExpressao(tokens, resultados, memoria)
+            exibirResultados(linha, resultados, memoria)
