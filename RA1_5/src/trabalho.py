@@ -101,6 +101,78 @@ def analisadorLexico(tokens):
     """
     return True
 
+# Implementar executarExpressao(const std::vector<std::string>& _tokens_, 
+# std::vector<float>& resultados, float& memoria) para executar uma expressão RPN;
+def executarExpressao(_tokens_, resultados, memoria):
+    pilha = []
+    i = 0
+    comand_mem = False  # marca se expressão foi só comando (ex: MEM)
+    comando_res  = False  # marca se expressão foi res (ex: N RES)
+    comand_other = False  # marca se expressão foi de memoria (ex: N MEM)
+
+    while i < len(_tokens_):
+        token = _tokens_[i]
+        if token == '(' or token == ')':
+            i += 1 # pular parênteses
+            continue
+        if len(_tokens_) == 3: # recebeu o nome da memoria
+            if token not in memoria:
+                pilha.append(0.0)  # valor padrão se não existir
+            else:
+                pilha.append(memoria[token])
+            comand_mem = True
+        elif len(_tokens_) == 4 and _tokens_[i + 1] == 'RES': # recebeu (N RES)
+            n = int(token)
+            comando_res = True
+            i += 1  # pular "RES"
+        elif len(_tokens_) == 4 and _tokens_[i + 1] != 'RES': # recebeu (N MEM)
+            n = float(token)
+            memoria.update({_tokens_[i+1]: n})
+            comand_other = True
+            i += 1  # pular nome da memoria
+        else: # Recebeu expressão matemática
+            if token not in {"+", "-", "*", "/", "%", "^"}: # se não for operador
+                try:
+                    pilha.append(float(token))
+                except ValueError:
+                    return ValueError(f"Token inválido recebido")
+            else: # se for operador
+                b = pilha.pop()
+                a = pilha.pop()
+                if token == "+": res = a + b
+                elif token == "-": res = a - b
+                elif token == "*": res = a * b
+                elif token == "/":
+                    if b == 0: raise ZeroDivisionError("Divisão por zero")
+                    res = a / b
+                elif token == "%":
+                    if b == 0: raise ZeroDivisionError("Resto por zero")
+                    res = a % b
+                elif token == "^": res = a ** b
+                pilha.append(float(res))
+        i += 1
+
+    # --- Verificação e returns ---
+    if comand_mem:
+        memory_value = pilha.pop()
+        return memory_value
+    elif comando_res:
+        if n < 0 or n >= len(resultados):
+            raise ValueError(f"Histórico inválido: {n}")
+        return resultados[-(n)]
+    elif comand_other:
+        return memoria
+    elif len(pilha) == 0:
+        return ValueError("Comentário lido")
+    elif len(pilha) == 1:
+        result = pilha.pop()
+        resultados.append(result)
+        return result
+    else:
+        raise ValueError("Expressão inválida (sobraram itens na pilha)")
+
+# Implementar exibirResultados(const std::vector<float>& resultados) para exibir 
+# os resultados das expressões; 
 def exibirResultados(linha, resultados, memoria):
     try:
         tokens = []
