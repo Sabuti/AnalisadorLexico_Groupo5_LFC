@@ -22,7 +22,6 @@ def lerArquivo(nomeArquivo, linhas):
         return
     return linhas
 
-
 # Implementar parseExpressao(std::string linha, std::vector<std::string>& _tokens_) 
 # (ou equivalente em Python/C) para analisar uma linha de expressão RPN e extrair tokens.
 def parseExpressao(linha, _tokens_): 
