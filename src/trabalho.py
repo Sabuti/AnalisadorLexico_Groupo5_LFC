@@ -78,7 +78,6 @@ def estadoOperador(token):
         case _:
             return False
 
-
 def estadoParenteses(token):
     match token:
         case "(" | ")":
@@ -111,7 +110,6 @@ def RESorMEM(token):
         return True
     return True
 
-
 # -------------------------
 # Analisador léxico: valida CADA token isoladamente
 def analisadorLexico(tokens):
@@ -129,8 +127,6 @@ def analisadorLexico(tokens):
         raise ValueError(f"Erro léxico: token inválido -> {token}")
 
     return True
-
-    
 
 # Implementar executarExpressao(const std::vector<std.string>& _tokens_, 
 # std::vector<float>& resultados, float& memoria) para executar uma expressão RPN;
@@ -238,22 +234,22 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
     def mul_16(dst, src):
         assembly.append(f"mov r24, {src[0]}")
         assembly.append(f"mov r25, {src[1]}")
-        assembly.append(f"andi r24, 0x80") 
+        #assembly.append(f"andi r24, 0x80") 
 
     def div_16(dst, src):
         assembly.append(f"mov r24, {src[0]}")
         assembly.append(f"mov r25, {src[1]}")
-        assembly.append("rcall div16")  # dst = dst / src
+        #assembly.append("rcall div16")  # dst = dst / src
 
     def mod_16(dst, src):
         assembly.append(f"mov r24, {src[0]}")
         assembly.append(f"mov r25, {src[1]}")
-        assembly.append("rcall mod16")  # dst = dst % src
+        #assembly.append("rcall mod16")  # dst = dst % src
 
     def pow_16(dst, src):
         assembly.append(f"mov r24, {src[0]}")
         assembly.append(f"mov r25, {src[1]}")
-        assembly.append("rcall pow16")  # dst = dst ^ src
+        #assembly.append("rcall pow16")  # dst = dst ^ src
 
     def load_float_16(val):
         nonlocal temp_count
@@ -342,6 +338,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
        print("Uso: python script.py <nome_do_arquivo>")
     else:
+        temp_count = 0
         linhas = []
         memoria = {}
         resultados = []
@@ -359,5 +356,23 @@ if __name__ == "__main__":
                 analisadorLexico(tokens)
                 retorno = executarExpressao(tokens, resultados, memoria)
                 exibirResultados(linha, retorno)
+                is_math_expression = all(t not in ['RES'] for t in tokens)
+                if is_math_expression and not isinstance(retorno, ValueError) and len(tokens) > 1:
+                    result_asm = gerarAssembly(tokens, codigoAssembly, assembly_rodata, temp_count)
+
+                    if isinstance(result_asm, ValueError):
+                        print(f"Erro ao gerar Assembly para a linha '{linha}': {result_asm}")
+                        continue
+                    else:
+                        temp_count = result_asm
             except ValueError as e:
                 print(e)
+
+        codigoAssembly.append("rjmp main")
+
+        # grava tudo no final em um arquivo
+        with open("./src/saida.S", "w") as f: # cria arquivo no src
+            f.write(".section .rodata\n")
+            f.write("\n".join(assembly_rodata) + "\n")
+            f.write(".text\n.global main\n")
+            f.write("\n".join(codigoAssembly))

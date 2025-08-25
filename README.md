@@ -17,5 +17,4 @@ Combinado entre os alunos que ajuda com suas funções seram permitidas.
 Execução do codigo
 
 1 - rodar "python trabalho.py nome_arquivo.txt"
-2 - pegar o arquivo .S e colocar no /src
-3 - dar upload pelo PlatformIO
+2 - dar upload pelo PlatformIO
