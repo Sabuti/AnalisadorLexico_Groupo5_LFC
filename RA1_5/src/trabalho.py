@@ -191,6 +191,116 @@ def exibirResultados(linha, resultados, memoria):
     except ValueError as e:
         print(e)
 
+def gerarAssembly(tokens, filename="saida.asm"):
+    mem_vals = {}
+    assembly = []
+    stack = []
+    temp_count = 0
+    next_reg = 22  # registradores livres começam em r22
+
+    mem_regs = {}  # token -> registradores [r?, r?]
+
+    # Cabeçalho
+    assembly.append(".include \"m328pdef.inc\"")
+    assembly.append(".global main")
+    assembly.append(".section .text")
+    assembly.append("main:")
+
+    # Função auxiliar para carregar float 16 bits
+    def load_float_16(val):
+        nonlocal temp_count
+        label = f"flt{temp_count}"
+        temp_count += 1
+        # Armazena valor 16 bits (fix-point)
+        assembly.append(".section .rodata")
+        assembly.append(f"{label}: .word {int(val*65536)}  ; 16-bit fix-point")
+        assembly.append(".section .text")
+        assembly.append(f"ldi r30, lo8({label})")
+        assembly.append(f"ldi r31, hi8({label})")
+        assembly.append("ld r22, Z+")
+        assembly.append("ld r23, Z")
+        return ["r22", "r23"]
+
+    # Função para pegar próximo registrador livre
+    def alloc_regs(n=2):
+        nonlocal next_reg
+        regs = [f"r{next_reg + i}" for i in range(n)]
+        next_reg += n
+        return regs
+
+    for token in tokens:
+        # número literal
+        if token.replace('.', '', 1).isdigit():
+            regs = load_float_16(float(token))
+            stack.append(regs)
+
+        # token de memória / identificador
+        elif token.isalpha():
+            tok_upper = token.upper()
+            if tok_upper in mem_regs:
+                regs = mem_regs[tok_upper]
+            else:
+                # pega valor inicial do dicionário ou 0
+                valor = mem_vals.get(tok_upper, 0)
+                regs = load_float_16(valor)
+                mem_regs[tok_upper] = alloc_regs()
+                # mover valor para registradores da memória
+                assembly.append(f"mov {mem_regs[tok_upper][0]}, {regs[0]}")
+                assembly.append(f"mov {mem_regs[tok_upper][1]}, {regs[1]}")
+                regs = mem_regs[tok_upper]
+            stack.append(regs.copy())
+
+        # operadores 16-bit
+        elif token in ['+', '-', '*', '/']:
+            if len(stack) < 2:
+                raise ValueError(f"Pilha insuficiente para operador '{token}'")
+
+            op2 = stack.pop()
+            op1 = stack.pop()
+
+            # mover para r18-r21
+            assembly.append(f"mov r18, {op1[0]}")
+            assembly.append(f"mov r19, {op1[1]}")
+            assembly.append(f"mov r20, {op2[0]}")
+            assembly.append(f"mov r21, {op2[1]}")
+
+            # chama função correspondente (você precisaria criar __add16, etc.)
+            if token == '+':
+                assembly.append("call __add16")
+            elif token == '-':
+                assembly.append("call __sub16")
+            elif token == '*':
+                assembly.append("call __mul16")
+            elif token == '/':
+                assembly.append("call __div16")
+            elif token == '^':
+                # checa se o op2 é inteiro
+                if '.' in op2 and float(op2) != int(float(op2)):
+                    raise ValueError(f"op2 não inteiro: {op2} (pow só suporta inteiro no AVR)")
+
+                assembly.append(f"; {op1} ^ {op2}")
+                assembly.append("call __powisf2")
+                stack.append("resultado_pow")
+
+
+            # empilha resultado em r22-r23
+            assembly.append("mov r22, r18")
+            assembly.append("mov r23, r19")
+            stack.append(["r22", "r23"])
+
+        else:
+            assembly.append(f"; Token desconhecido: {token}")
+
+    assembly.append("; Resultado final em r22-r23")
+    assembly.append("ret")
+
+    # escrever arquivo
+    with open(filename, "w") as f:
+        f.write("\n".join(assembly))
+
+    return "\n".join(assembly)
+
+
 #implementado o main que lê o arquivo_teste.txt, chama parseExpressao e depois 
 # analisadorLexico.
 if __name__ == "__main__":
@@ -207,4 +317,5 @@ if __name__ == "__main__":
             parseExpressao(linha, tokens)
             analisadorLexico(tokens)
             executarExpressao(tokens, resultados, memoria)
-            exibirResultados(linha, resultados, memoria)
+            gerarAssembly(tokens)
+            #exibirResultados(linha, resultados, memoria)
