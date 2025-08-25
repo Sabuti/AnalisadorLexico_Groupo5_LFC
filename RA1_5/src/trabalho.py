@@ -1,9 +1,9 @@
 # Ana Maria Midori Rocha Hinoshita - anamariamidori
 # Lucas Antonio Linhares - Sabuti
 # RA1 5
-#teste 1
 
 import sys # import para gerenciar argumentos de linha de comando
+import math
 
 # Implementar lerArquivo(std::string nomeArquivo, std::vector<std::string>& linhas) 
 # para ler o arquivo de entrada;
@@ -22,7 +22,7 @@ def lerArquivo(nomeArquivo, linhas):
         return
     return linhas
 
-# Implementar parseExpressao(std::string linha, std::vector<std::string>& _tokens_) 
+# Implementar parseExpressao(std::string linha, std::vector<std.string>& _tokens_) 
 # (ou equivalente em Python/C) para analisar uma linha de expressão RPN e extrair tokens.
 def parseExpressao(linha, _tokens_): 
     token = ""
@@ -30,7 +30,7 @@ def parseExpressao(linha, _tokens_):
     i = 0
     while i < len(linha):
         char = linha[i]
-        if char =="$":
+        if char == "$":
             i += 1
             break
         elif char.isspace():# Ignorar espaços
@@ -76,31 +76,9 @@ def analisadorLexico(tokens):
                 # Se não for número, tem que ser identificador válido (apenas maiúsculas)
                 if not (t.isalpha() and t.isupper()):
                     return False  # indica que deu erro
-    """ --- Código de debug ---
-    operadores = {'+': 'Operador de Adição', 
-                  '-': 'Operador de Subtração', 
-                  '*': 'Operador de Multiplicação', 
-                  '/': 'Operador de Divisão', 
-                  '%': 'Operador de Resto', 
-                  '^': 'Operador de Potenciação', 
-                  '(': 'Parêntese Aberto', 
-                  ')': 'Parêntese Fechado', 
-                  'RES': 'RES',
-                  'MEM': 'Memoria'}
-    
-    for token in tokens:
-        if token in operadores:
-            print(f"Token: {token}, Tipo: {operadores[token]}")
-        else:
-            try:
-                float(token)
-                print(f"Token: {token}, Tipo: Número")
-            except ValueError:
-                print(f"Token: {token}, Tipo: Memoria")
-    """
     return True
 
-# Implementar executarExpressao(const std::vector<std::string>& _tokens_, 
+# Implementar executarExpressao(const std::vector<std.string>& _tokens_, 
 # std::vector<float>& resultados, float& memoria) para executar uma expressão RPN;
 def executarExpressao(_tokens_, resultados, memoria):
     pilha = []
@@ -192,115 +170,123 @@ def exibirResultados(linha, resultados, memoria):
     except ValueError as e:
         print(e)
 
-def gerarAssembly(tokens, filename="saida.asm"):
-    mem_vals = {}
-    assembly = []
+def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
     stack = []
-    temp_count = 0
     next_reg = 22  # registradores livres começam em r22
 
-    mem_regs = {}  # token -> registradores [r?, r?]
+    # Funções para chamar rotinas 16-bit
+    def add_16(dst, src):
+        assembly.append(f"mov r24, {src[0]}")
+        assembly.append(f"mov r25, {src[1]}")
+        assembly.append(f"add r22, r24")
+        assembly.append(f"adc r23, r25")
 
-    # Cabeçalho
-    assembly.append(".include \"m328pdef.inc\"")
-    assembly.append(".global main")
-    assembly.append(".section .text")
-    assembly.append("main:")
+    def sub_16(dst, src):
+        assembly.append(f"mov r24, {src[0]}")
+        assembly.append(f"mov r25, {src[1]}")
+        assembly.append("sub r22, r24")
+        assembly.append("sbc r23, r25")
 
-    # Função auxiliar para carregar float 16 bits
+    def mul_16(dst, src):
+        assembly.append(f"mov r24, {src[0]}")
+        assembly.append(f"mov r25, {src[1]}")
+        assembly.append(f"andi r24, 0x80") 
+
+    def div_16(dst, src):
+        assembly.append(f"mov r24, {src[0]}")
+        assembly.append(f"mov r25, {src[1]}")
+        assembly.append("rcall div16")  # dst = dst / src
+
+    def mod_16(dst, src):
+        assembly.append(f"mov r24, {src[0]}")
+        assembly.append(f"mov r25, {src[1]}")
+        assembly.append("rcall mod16")  # dst = dst % src
+
+    def pow_16(dst, src):
+        assembly.append(f"mov r24, {src[0]}")
+        assembly.append(f"mov r25, {src[1]}")
+        assembly.append("rcall pow16")  # dst = dst ^ src
+
     def load_float_16(val):
         nonlocal temp_count
+        try:
+            fval = float(val)
+        except ValueError:
+            return ValueError(f"Token inválido: {val}")
+
+        # Handle special cases
+        if fval == 0.0:
+            word_val = 0x0000  # Zero
+        elif math.isinf(fval):
+            word_val = 0x7C00 if fval > 0 else 0xFC00  # Infinity (+/-)
+        elif math.isnan(fval):
+            word_val = 0x7E00  # NaN
+        else:
+            # Convert to IEEE 754 half-precision
+            # Python's struct can convert to float16, but we need to extract the bits
+            # Use a custom conversion for simplicity
+            sign = 0 if fval >= 0 else 1
+            fval = abs(fval)
+            if fval == 0:
+                word_val = 0
+            else:
+                # Extract exponent and mantissa
+                exponent = math.floor(math.log2(fval)) if fval != 0 else 0
+                mantissa = fval / (2 ** exponent) - 1.0  # Get fractional part
+                biased_exponent = exponent + 15  # Bias = 15
+                if biased_exponent <= 0:  # Denormal
+                    mantissa = fval / (2 ** -14)  # Adjust for denormal
+                    biased_exponent = 0
+                elif biased_exponent >= 31:  # Infinity
+                    return 0x7C00 if sign == 0 else 0xFC00
+                mantissa_bits = int(mantissa * (2 ** 10)) & 0x3FF  # 10-bit mantissa
+                word_val = (sign << 15) | (biased_exponent << 10) | mantissa_bits
+
         label = f"flt{temp_count}"
+        assembly_rodata.append(f"{label}: .word 0x{word_val:04X}")
         temp_count += 1
-        # Armazena valor 16 bits (fix-point)
-        assembly.append(".section .rodata")
-        assembly.append(f"{label}: .word {int(val*65536)}  ; 16-bit fix-point")
-        assembly.append(".section .text")
         assembly.append(f"ldi r30, lo8({label})")
         assembly.append(f"ldi r31, hi8({label})")
-        assembly.append("ld r22, Z+")
-        assembly.append("ld r23, Z")
+        assembly.append("lpm r22, Z+")
+        assembly.append("lpm r23, Z")
         return ["r22", "r23"]
 
-    # Função para pegar próximo registrador livre
-    def alloc_regs(n=2):
-        nonlocal next_reg
-        regs = [f"r{next_reg + i}" for i in range(n)]
-        next_reg += n
-        return regs
-
     for token in tokens:
-        # número literal
-        if token.replace('.', '', 1).isdigit():
-            regs = load_float_16(float(token))
-            stack.append(regs)
+        try:
+            float(token)
+            is_number = True
+        except ValueError:
+            is_number = False
 
-        # token de memória / identificador
-        elif token.isalpha():
-            tok_upper = token.upper()
-            if tok_upper in mem_regs:
-                regs = mem_regs[tok_upper]
-            else:
-                # pega valor inicial do dicionário ou 0
-                valor = mem_vals.get(tok_upper, 0)
-                regs = load_float_16(valor)
-                mem_regs[tok_upper] = alloc_regs()
-                # mover valor para registradores da memória
-                assembly.append(f"mov {mem_regs[tok_upper][0]}, {regs[0]}")
-                assembly.append(f"mov {mem_regs[tok_upper][1]}, {regs[1]}")
-                regs = mem_regs[tok_upper]
-            stack.append(regs.copy())
-
-        # operadores 16-bit
-        elif token in ['+', '-', '*', '/']:
-            if len(stack) < 2:
-                raise ValueError(f"Pilha insuficiente para operador '{token}'")
-
-            op2 = stack.pop()
-            op1 = stack.pop()
-
-            # mover para r18-r21
-            assembly.append(f"mov r18, {op1[0]}")
-            assembly.append(f"mov r19, {op1[1]}")
-            assembly.append(f"mov r20, {op2[0]}")
-            assembly.append(f"mov r21, {op2[1]}")
-
-            # chama função correspondente (você precisaria criar __add16, etc.)
+        if is_number:
+            reg = load_float_16(token)
+            if isinstance(reg, ValueError):
+                return reg
+            stack.append(reg)
+        elif token in ['+', '-', '*', '/', '%', '^']:
+            try:
+                b = stack.pop()
+                a = stack.pop()
+            except IndexError:
+                return ValueError("Operador inválido.")
             if token == '+':
-                assembly.append("call __add16")
+                add_16(a, b)
             elif token == '-':
-                assembly.append("call __sub16")
+                sub_16(a, b)
             elif token == '*':
-                assembly.append("call __mul16")
+                mul_16(a, b)
             elif token == '/':
-                assembly.append("call __div16")
+                div_16(a, b)
+            elif token == '%':
+                mod_16(a, b)
             elif token == '^':
-                # checa se o op2 é inteiro
-                if '.' in op2 and float(op2) != int(float(op2)):
-                    raise ValueError(f"op2 não inteiro: {op2} (pow só suporta inteiro no AVR)")
-
-                assembly.append(f"; {op1} ^ {op2}")
-                assembly.append("call __powisf2")
-                stack.append("resultado_pow")
-
-
-            # empilha resultado em r22-r23
-            assembly.append("mov r22, r18")
-            assembly.append("mov r23, r19")
-            stack.append(["r22", "r23"])
-
+                pow_16(a, b)
+            stack.append(a)  # Result in r22:r23
         else:
-            assembly.append(f"; Token desconhecido: {token}")
+            pass  # Ignore other tokens (e.g., parentheses)
 
-    assembly.append("; Resultado final em r22-r23")
-    assembly.append("ret")
-
-    # escrever arquivo
-    with open(filename, "w") as f:
-        f.write("\n".join(assembly))
-
-    return "\n".join(assembly)
-
+    # Retorna o valor atualizado de temp_count
+    return temp_count
 
 #implementado o main que lê o arquivo_teste.txt, chama parseExpressao e depois 
 # analisadorLexico.
@@ -311,12 +297,54 @@ if __name__ == "__main__":
         linhas = []
         memoria = {}
         resultados = []
+        codigoAssembly = []
+        assembly_rodata = []
+        temp_count = 0
+        codigoAssembly.append(".global main")
+        codigoAssembly.append(".text")
+        codigoAssembly.append("main:")
         caminho = sys.argv[1]
         lerArquivo(caminho, linhas)
         for linha in linhas:
             tokens = []
-            parseExpressao(linha, tokens)
-            analisadorLexico(tokens)
-            executarExpressao(tokens, resultados, memoria)
-            gerarAssembly(tokens)
-            #exibirResultados(linha, resultados, memoria)
+            try:
+                # Tenta analisar a linha
+                parseExpressao(linha, tokens)
+                analisadorLexico(tokens)
+
+                # Processa a linha com o interpretador primeiro
+                result_exec = executarExpressao(tokens, resultados, memoria)
+                
+                # Se o interpretador retornar um erro, imprime a mensagem e pula para a próxima linha
+                if isinstance(result_exec, ValueError):
+                    print(f"Erro na linha '{linha}': {result_exec}")
+                    continue
+
+                # Se a execução foi bem sucedida e a linha é uma expressão matemática,
+                # gera o assembly para ela.
+                is_math_expression = all(t not in ['MEM', 'RES', 'MEN'] for t in tokens)
+                if is_math_expression:
+                    result_asm = gerarAssembly(tokens, codigoAssembly, assembly_rodata, temp_count)
+
+                    if isinstance(result_asm, ValueError):
+                        print(f"Erro ao gerar Assembly para a linha '{linha}': {result_asm}")
+                        continue
+                    else:
+                        temp_count = result_asm
+                else:
+                    # Imprime o resultado do interpretador, mas não gera assembly
+                    print(f"Linha '{linha}' processada, mas ignorada para geração de assembly.")
+
+            except ValueError as e:
+                # Captura erros de parsing ou léxico
+                print(f"Erro na linha '{linha}': {e}")
+                continue
+
+        codigoAssembly.append("rjmp main")
+
+        # grava tudo no final em um arquivo
+        with open("saida.S", "w") as f:
+            f.write(".section .rodata\n")
+            f.write("\n".join(assembly_rodata) + "\n")
+            f.write(".text\n.global main\n")
+            f.write("\n".join(codigoAssembly))
