@@ -30,10 +30,7 @@ def parseExpressao(linha, _tokens_):
     i = 0
     while i < len(linha):
         char = linha[i]
-        if char =="$":
-            i += 1
-            break
-        elif char.isspace():# Ignorar espaços
+        if char.isspace():  # espaço em branco
             if token:
                 _tokens_.append(token)
                 token = ""
@@ -64,6 +61,8 @@ def parseExpressao(linha, _tokens_):
 
 #funções de estado para o analisador léxico
 def estadoNumero(token):
+    if not token:
+        return False
     try:
         if token.count(".") > 1: # Checa se há mais de um ponto decimal
             return False
@@ -73,62 +72,64 @@ def estadoNumero(token):
         return False
     
 def estadoOperador(token):
-    operadores = {"+", "-", "*", "/", "%", "^"}
-    if token in operadores:
-        return True
-    else:
-        return False
+    match token:
+        case "+" | "-" | "*" | "/" | "%" | "^":
+            return True
+        case _:
+            return False
+
+
 def estadoParenteses(token):
-    if token in {"(", ")"}:
-        return True
-    else:
+    match token:
+        case "(" | ")":
+            return True
+        case _:
+            return False
+
+# AFD: identificadores/COMANDOS (RES/MEM)
+def RESorMEM(token):
+    if not token:
         return False
 
-def estadoComando(token):
-    if token == "RES" :
-        return True
-    elif token.isalpha() and token.isupper():
-        return True
-    else:
-        return False
+    estado = "Q0"  # Q0(início), QID
+    for ch in token:
+        match estado:
+            case "Q0":
+                if ch.isalpha() and ch.isupper():
+                    estado = "QID"
+                else:
+                    return False
+            case "QID":
+                if ch.isalpha() and ch.isupper():
+                    pass
+                elif ch.isdigit():
+                    pass
+                else:
+                    return False
 
-
-# Implementado o analisador léxico que recebe os tokens extraídos por parseExpressao e 
-# imprime cada token com seu tipo.
-def analisadorLexico(tokens): 
-    operadores_valida = ['+', '-', '*', '/', '%','^' ,'(', ')', 'RES']  
-    for t in tokens:# Validação dos tokens
-        if t not in operadores_valida and t not in ["(", ")"]:  
-            # Testa número
-            try:
-                float(t)
-            except ValueError:
-                # Se não for número, tem que ser identificador válido (apenas maiúsculas)
-                if not (t.isalpha() and t.isupper()):
-                    return False  # indica que deu erro
-    """ --- Código de debug ---
-    operadores = {'+': 'Operador de Adição', 
-                  '-': 'Operador de Subtração', 
-                  '*': 'Operador de Multiplicação', 
-                  '/': 'Operador de Divisão', 
-                  '%': 'Operador de Resto', 
-                  '^': 'Operador de Potenciação', 
-                  '(': 'Parêntese Aberto', 
-                  ')': 'Parêntese Fechado', 
-                  'RES': 'RES',
-                  'MEM': 'Memoria'}
-    
-    for token in tokens:
-        if token in operadores:
-            print(f"Token: {token}, Tipo: {operadores[token]}")
-        else:
-            try:
-                float(token)
-                print(f"Token: {token}, Tipo: Número")
-            except ValueError:
-                print(f"Token: {token}, Tipo: Memoria")
-    """
+    if token in {"RES", "MEM"}:
+        return True
     return True
+
+
+# -------------------------
+# Analisador léxico: valida CADA token isoladamente
+def analisadorLexico(tokens):
+    for token in tokens:
+        if estadoParenteses(token):
+            continue
+        if estadoOperador(token):
+            continue
+        if estadoNumero(token):
+            continue
+        if RESorMEM(token):  # aceita tanto CMD (RES/MEM) quanto ID (nomes de memória)
+            continue
+
+        # Se não passou em nada, é inválido
+        raise ValueError(f"Erro léxico: token inválido -> {token}")
+
+    return True
+
     
 
 # Implementar executarExpressao(const std::vector<std.string>& _tokens_, 
@@ -346,7 +347,6 @@ if __name__ == "__main__":
         resultados = []
         codigoAssembly = []
         assembly_rodata = []
-        temp_count = 0
         codigoAssembly.append(".global main")
         codigoAssembly.append(".text")
         codigoAssembly.append("main:")
@@ -354,7 +354,10 @@ if __name__ == "__main__":
         lerArquivo(caminho, linhas)
         for linha in linhas:
             tokens = []
-            parseExpressao(linha, tokens)
-            analisadorLexico(tokens)
-            executarExpressao(tokens, resultados, memoria)
-            exibirResultados(linha, resultados, memoria)
+            try:
+                parseExpressao(linha, tokens)
+                analisadorLexico(tokens)
+                retorno = executarExpressao(tokens, resultados, memoria)
+                exibirResultados(linha, retorno)
+            except ValueError as e:
+                print(e)
