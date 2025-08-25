@@ -24,20 +24,17 @@ def lerArquivo(nomeArquivo, linhas):
 
 # Implementar parseExpressao(std::string linha, std::vector<std.string>& _tokens_) 
 # (ou equivalente em Python/C) para analisar uma linha de expressão RPN e extrair tokens.
-def parseExpressao(linha, _tokens_): 
+def parseExpressao(linha, _tokens_):
     token = ""
     parenteses = 0
     i = 0
     while i < len(linha):
         char = linha[i]
-        if char == "$":
-            i += 1
-            break
-        elif char.isspace():# Ignorar espaços
+        if char.isspace():  # espaço em branco
             if token:
                 _tokens_.append(token)
                 token = ""
-        elif char in "()":# Tratamento de parênteses
+        elif char in "()":  # parênteses
             if token:
                 _tokens_.append(token)
                 token = ""
@@ -48,94 +45,154 @@ def parseExpressao(linha, _tokens_):
                 parenteses -= 1
                 if parenteses < 0:
                     raise ValueError("Erro: parêntese fechado sem correspondente.")
-        elif char in "+-*/%^": # Tratamento de operadores
+        elif char in "+-*/%^":  # operadores
             if token:
                 _tokens_.append(token)
                 token = ""
             _tokens_.append(char)
-        else: # Acúmulo de token (pode ser número ou identificador)
+        else:  # acumula números ou comandos (ex: MEM, RES)
             token += char
         i += 1
     if token:
         _tokens_.append(token)
-    if parenteses != 0:# Verificação final dos parênteses
+    if parenteses != 0:
         raise ValueError("Erro: parênteses desbalanceados.")
     return True
 
+#funções de estado para o analisador léxico
+def estadoNumero(token):
+    if not token:
+        return False
+    try:
+        if token.count(".") > 1: # Checa se há mais de um ponto decimal
+            return False
+        float(token)
+        return True
+    except ValueError:
+        return False
+    
+def estadoOperador(token):
+    match token:
+        case "+" | "-" | "*" | "/" | "%" | "^":
+            return True
+        case _:
+            return False
 
-# Implementado o analisador léxico que recebe os tokens extraídos por parseExpressao e 
-# imprime cada token com seu tipo.
-def analisadorLexico(tokens): 
-    operadores_valida = ['+', '-', '*', '/', '%','^' ,'(', ')', 'RES']  
-    for t in tokens:# Validação dos tokens
-        if t not in operadores_valida and t not in ["(", ")"]:  
-            # Testa número
-            try:
-                float(t)
-            except ValueError:
-                # Se não for número, tem que ser identificador válido (apenas maiúsculas)
-                if not (t.isalpha() and t.isupper()):
-                    return False  # indica que deu erro
+
+def estadoParenteses(token):
+    match token:
+        case "(" | ")":
+            return True
+        case _:
+            return False
+
+# AFD: identificadores/COMANDOS (RES/MEM)
+def RESorMEM(token):
+    if not token:
+        return False
+
+    estado = "Q0"  # Q0(início), QID
+    for ch in token:
+        match estado:
+            case "Q0":
+                if ch.isalpha() and ch.isupper():
+                    estado = "QID"
+                else:
+                    return False
+            case "QID":
+                if ch.isalpha() and ch.isupper():
+                    pass
+                elif ch.isdigit():
+                    pass
+                else:
+                    return False
+
+    if token in {"RES", "MEM"}:
+        return True
     return True
+
+
+# -------------------------
+# Analisador léxico: valida CADA token isoladamente
+def analisadorLexico(tokens):
+    for token in tokens:
+        if estadoParenteses(token):
+            continue
+        if estadoOperador(token):
+            continue
+        if estadoNumero(token):
+            continue
+        if RESorMEM(token):  # aceita tanto CMD (RES/MEM) quanto ID (nomes de memória)
+            continue
+
+        # Se não passou em nada, é inválido
+        raise ValueError(f"Erro léxico: token inválido -> {token}")
+
+    return True
+
+    
 
 # Implementar executarExpressao(const std::vector<std.string>& _tokens_, 
 # std::vector<float>& resultados, float& memoria) para executar uma expressão RPN;
 def executarExpressao(_tokens_, resultados, memoria):
     pilha = []
     i = 0
-    comand_mem = False  # marca se expressão foi só comando (ex: MEM)
-    comando_res  = False  # marca se expressão foi res (ex: N RES)
-    comand_other = False  # marca se expressão foi de memoria (ex: N MEM)
+    comand_mem = False
+    comando_res  = False
+    comand_other = False
 
     while i < len(_tokens_):
         token = _tokens_[i]
         if token == '(' or token == ')':
-            i += 1 # pular parênteses
+            i += 1
             continue
-        if len(_tokens_) == 3: # recebeu o nome da memoria
+        if len(_tokens_) == 3:  # Comando memória: VAR
             if token not in memoria:
-                pilha.append(0.0)  # valor padrão se não existir
+                pilha.append(0.0)
             else:
                 pilha.append(memoria[token])
             comand_mem = True
-        elif len(_tokens_) == 4 and _tokens_[i + 1] == 'RES': # recebeu (N RES)
+        elif len(_tokens_) == 4 and _tokens_[i + 1] == 'RES':  # N RES
             n = int(token)
             comando_res = True
-            i += 1  # pular "RES"
-        elif len(_tokens_) == 4 and _tokens_[i + 1] != 'RES': # recebeu (N MEM)
+            i += 1
+        elif len(_tokens_) == 4 and _tokens_[i + 1] != 'RES':  # N MEM
             n = float(token)
             memoria.update({_tokens_[i+1]: n})
             comand_other = True
-            i += 1  # pular nome da memoria
-        else: # Recebeu expressão matemática
-            if token not in {"+", "-", "*", "/", "%", "^"}: # se não for operador
+            i += 1
+        else:  # expressão matemática
+            if token not in {"+", "-", "*", "/", "%", "^"}:
                 try:
                     pilha.append(float(token))
                 except ValueError:
-                    return ValueError(f"Token inválido recebido")
-            else: # se for operador
-                b = pilha.pop()
-                a = pilha.pop()
+                    return ValueError(f"Token inválido recebido: {token}")
+            else:
+                try:
+                    b = pilha.pop()
+                    a = pilha.pop()
+                except IndexError:
+                    return ValueError("Expressão inválida: operandos insuficientes")
+
                 if token == "+": res = a + b
                 elif token == "-": res = a - b
                 elif token == "*": res = a * b
                 elif token == "/":
-                    if b == 0: raise ZeroDivisionError("Divisão por zero")
+                    if b == 0: return ValueError("Erro: divisão por zero")
                     res = a / b
                 elif token == "%":
-                    if b == 0: raise ZeroDivisionError("Resto por zero")
+                    if b == 0: return ValueError("Erro: resto por zero")
                     res = a % b
                 elif token == "^": res = a ** b
                 pilha.append(float(res))
         i += 1
 
-    # --- Verificação e returns ---
+    # --- Verificação final ---
     if comand_mem:
-        memory_value = pilha.pop()
-        return memory_value
+        return pilha.pop()
     elif comando_res:
         if n < 0 or n >= len(resultados):
-            raise ValueError(f"Histórico inválido: {n}")
+            return ValueError(f"Histórico inválido: {n}")
         return resultados[-(n)]
     elif comand_other:
         return memoria
@@ -146,29 +203,20 @@ def executarExpressao(_tokens_, resultados, memoria):
         resultados.append(result)
         return result
     else:
-        raise ValueError("Expressão inválida (sobraram itens na pilha)")
+        return ValueError("Expressão inválida (sobraram itens na pilha)")
 
 # Implementar exibirResultados(const std::vector<float>& resultados) para exibir 
 # os resultados das expressões; 
-def exibirResultados(linha, resultados, memoria):
-    try:
-        tokens = []
-        parseExpressao(linha, tokens)
-        if len(tokens) == 3:  # Comando de memória (ex: VAR)
-            valor_memoria = executarExpressao(tokens, resultados, memoria)
-            print(f"Valor na memória '{tokens[1]}': {valor_memoria}")
-        elif len(tokens) == 4 and tokens[2] == 'RES':  # Comando RES (ex: N RES)
-            n = int(tokens[1])
-            valor_res = executarExpressao(tokens, resultados, memoria)
-            print(f"Resultado RES {n}: {valor_res}")
-        elif len(tokens) == 4 and tokens[2] != 'RES':  # Comando MEM (ex: N MEM)
-            executarExpressao(tokens, resultados, memoria)
-            print(f"Valor '{tokens[1]}' armazenado na memória '{tokens[2]}'")
-        else:  # Expressão matemática
-            resultado = executarExpressao(tokens, resultados, memoria)
-            print(f"Resultado da expressão '{linha}': {resultado}")
-    except ValueError as e:
-        print(e)
+def exibirResultados(linha, retorno):
+    if isinstance(retorno, (float, int)):
+        print(f"Resultado da expressão '{linha}': {retorno:.1f}")
+    elif isinstance(retorno, dict):
+        for chave, valor in retorno.items():
+            print(f"Memória '{chave}': {valor:.1f}")
+    elif isinstance(retorno, ValueError):
+        print(f"Erro na linha '{linha}': {retorno}")
+    else:
+        print(f"Linha '{linha}' ignorada.")
 
 def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
     stack = []
@@ -292,14 +340,13 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
 # analisadorLexico.
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Uso: python script.py <nome_do_arquivo>")
+       print("Uso: python script.py <nome_do_arquivo>")
     else:
         linhas = []
         memoria = {}
         resultados = []
         codigoAssembly = []
         assembly_rodata = []
-        temp_count = 0
         codigoAssembly.append(".global main")
         codigoAssembly.append(".text")
         codigoAssembly.append("main:")
@@ -308,43 +355,9 @@ if __name__ == "__main__":
         for linha in linhas:
             tokens = []
             try:
-                # Tenta analisar a linha
                 parseExpressao(linha, tokens)
                 analisadorLexico(tokens)
-
-                # Processa a linha com o interpretador primeiro
-                result_exec = executarExpressao(tokens, resultados, memoria)
-                
-                # Se o interpretador retornar um erro, imprime a mensagem e pula para a próxima linha
-                if isinstance(result_exec, ValueError):
-                    print(f"Erro na linha '{linha}': {result_exec}")
-                    continue
-
-                # Se a execução foi bem sucedida e a linha é uma expressão matemática,
-                # gera o assembly para ela.
-                is_math_expression = all(t not in ['MEM', 'RES', 'MEN'] for t in tokens)
-                if is_math_expression:
-                    result_asm = gerarAssembly(tokens, codigoAssembly, assembly_rodata, temp_count)
-
-                    if isinstance(result_asm, ValueError):
-                        print(f"Erro ao gerar Assembly para a linha '{linha}': {result_asm}")
-                        continue
-                    else:
-                        temp_count = result_asm
-                else:
-                    # Imprime o resultado do interpretador, mas não gera assembly
-                    print(f"Linha '{linha}' processada, mas ignorada para geração de assembly.")
-
+                retorno = executarExpressao(tokens, resultados, memoria)
+                exibirResultados(linha, retorno)
             except ValueError as e:
-                # Captura erros de parsing ou léxico
-                print(f"Erro na linha '{linha}': {e}")
-                continue
-
-        codigoAssembly.append("rjmp main")
-
-        # grava tudo no final em um arquivo
-        with open("saida.S", "w") as f:
-            f.write(".section .rodata\n")
-            f.write("\n".join(assembly_rodata) + "\n")
-            f.write(".text\n.global main\n")
-            f.write("\n".join(codigoAssembly))
+                print(e)
