@@ -62,6 +62,7 @@ def parseExpressao(linha, _tokens_):
         raise ValueError("Erro: parênteses desbalanceados.")
     return True
 
+
 # Implementado o analisador léxico que recebe os tokens extraídos por parseExpressao e 
 # imprime cada token com seu tipo.
 def analisadorLexico(tokens): 
@@ -148,7 +149,7 @@ def executarExpressao(_tokens_, resultados, memoria):
         raise ValueError("Expressão inválida (sobraram itens na pilha)")
 
 # Implementar exibirResultados(const std::vector<float>& resultados) para exibir 
-# os resultados das expressões;    
+# os resultados das expressões; 
 def exibirResultados(linha, resultados, memoria):
     try:
         tokens = []
