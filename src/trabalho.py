@@ -113,14 +113,19 @@ def RESorMEM(token):
 # -------------------------
 # Analisador léxico: valida CADA token isoladamente
 def analisadorLexico(tokens):
+    f = open("../AnalisadorLexico_Groupo5_LFC/funcoes_analisador.txt", "a")
     for token in tokens:
         if estadoParenteses(token):
-            continue
+           f.write(token+"\n")
+           continue
         if estadoOperador(token):
+            f.write(token)
             continue
         if estadoNumero(token):
+            f.write(token)
             continue
-        if RESorMEM(token):  # aceita tanto CMD (RES/MEM) quanto ID (nomes de memória)
+        if RESorMEM(token):
+            f.write(token)  # aceita tanto CMD (RES/MEM) quanto ID (nomes de memória)
             continue
 
         # Se não passou em nada, é inválido
