@@ -113,11 +113,11 @@ def RESorMEM(token):
 # -------------------------
 # Analisador léxico: valida CADA token isoladamente
 def analisadorLexico(tokens):
-    f = open("../AnalisadorLexico_Groupo5_LFC/funcoes_analisador.txt", "a")
+    f = open("funcoes_analisador.txt", "a")
     for token in tokens:
         if estadoParenteses(token):
-           f.write(token+"\n")
-           continue
+            f.write(token+"\n")
+            continue
         if estadoOperador(token):
             f.write(token)
             continue
@@ -221,40 +221,9 @@ def exibirResultados(linha, retorno):
 
 def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
     stack = []
-    next_reg = 22  # registradores livres começam em r22
-
-    # Funções para chamar rotinas 16-bit
-    def add_16(dst, src):
-        assembly.append(f"mov r24, {src[0]}")
-        assembly.append(f"mov r25, {src[1]}")
-        assembly.append(f"add r22, r24")
-        assembly.append(f"adc r23, r25")
-
-    def sub_16(dst, src):
-        assembly.append(f"mov r24, {src[0]}")
-        assembly.append(f"mov r25, {src[1]}")
-        assembly.append("sub r22, r24")
-        assembly.append("sbc r23, r25")
-
-    def mul_16(dst, src):
-        assembly.append(f"mov r24, {src[0]}")
-        assembly.append(f"mov r25, {src[1]}")
-        #assembly.append(f"andi r24, 0x80") 
-
-    def div_16(dst, src):
-        assembly.append(f"mov r24, {src[0]}")
-        assembly.append(f"mov r25, {src[1]}")
-        #assembly.append("rcall div16")  # dst = dst / src
-
-    def mod_16(dst, src):
-        assembly.append(f"mov r24, {src[0]}")
-        assembly.append(f"mov r25, {src[1]}")
-        #assembly.append("rcall mod16")  # dst = dst % src
-
-    def pow_16(dst, src):
-        assembly.append(f"mov r24, {src[0]}")
-        assembly.append(f"mov r25, {src[1]}")
-        #assembly.append("rcall pow16")  # dst = dst ^ src
+    reg_temp = 26
+    for r in range(22, 26): # Limpa registradores temporários
+        assembly.append(f"clr r{r}")
 
     def load_float_16(val):
         nonlocal temp_count
@@ -271,9 +240,6 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
         elif math.isnan(fval):
             word_val = 0x7E00  # NaN
         else:
-            # Convert to IEEE 754 half-precision
-            # Python's struct can convert to float16, but we need to extract the bits
-            # Use a custom conversion for simplicity
             sign = 0 if fval >= 0 else 1
             fval = abs(fval)
             if fval == 0:
@@ -294,11 +260,11 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
         label = f"flt{temp_count}"
         assembly_rodata.append(f"{label}: .word 0x{word_val:04X}")
         temp_count += 1
-        assembly.append(f"ldi r30, lo8({label})")
-        assembly.append(f"ldi r31, hi8({label})")
-        assembly.append("lpm r22, Z+")
-        assembly.append("lpm r23, Z")
-        return ["r22", "r23"]
+        assembly.append(f"ldi r30, lo8({label})") # Carrega endereço do float
+        assembly.append(f"ldi r31, hi8({label})") # Carrega endereço do float
+        assembly.append("lpm r22, Z+") # Carrega parte baixa
+        assembly.append("lpm r23, Z") # Carrega parte alta
+        return ["r22", "r23"] # Resultado da equação fica em r22:r23
 
     for token in tokens:
         try:
@@ -308,7 +274,11 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
             is_number = False
 
         if is_number:
+            if reg_temp > 30:  # Limite de registradores temporários
+                reg_temp = 26  # Reseta para o início
             reg = load_float_16(token)
+            assembly.append(f"movw r{reg_temp}, r22")  # Move word para registrador temporário
+            reg_temp += 2
             if isinstance(reg, ValueError):
                 return reg
             stack.append(reg)
@@ -318,19 +288,78 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
                 a = stack.pop()
             except IndexError:
                 return ValueError("Operador inválido.")
+
             if token == '+':
-                add_16(a, b)
+                assembly.append(f"add r{reg_temp-2}, r{reg_temp-4}")
+                assembly.append(f"adc r{reg_temp-1}, r{reg_temp-3}")
+                assembly.append(f"movw r24, r{reg_temp-2}")
             elif token == '-':
-                sub_16(a, b)
+                assembly.append(f"sub r{reg_temp-2}, r{reg_temp-4}")
+                assembly.append(f"sbc r{reg_temp-1}, r{reg_temp-3}")
+                assembly.append(f"mov r24, r{reg_temp-2}")  # Move resultado para r24:r25
+                assembly.append(f"mov r25, r{reg_temp-1}")
             elif token == '*':
-                mul_16(a, b)
+                assembly.append(f"mov r18, r{reg_temp-4}")  # Multiplicando em r18:r19
+                assembly.append(f"mov r19, r{reg_temp-3}")
+                assembly.append(f"mov r20, r{reg_temp-2}")  # Multiplicador em r20:r21
+                assembly.append(f"mov r21, r{reg_temp-1}")
+                assembly.append("mul r18, r21")  # a_low * b_low
+                assembly.append("mov r22, r0")   # Armazena o resultado parcial
+                assembly.append("mov r23, r1")
+                assembly.append("mul r19, r20") # a_high * b_low (<<8)
+                assembly.append("add r23, r0")  # Adiciona ao resultado parcial
+                assembly.append("mul r18, r20") # a_low * b_high (<<8)
+                assembly.append("add r23, r0")  # Adiciona ao resultado parcial
+                assembly.append("clr r0")      # Limpa registrador temporário
             elif token == '/':
-                div_16(a, b)
-            elif token == '%':
-                mod_16(a, b)
+                assembly.append("div_loop:")
+                assembly.append(f"    cp r{reg_temp-4}, r{reg_temp-2}")  # Compara A com B
+                assembly.append(f"    cpc r{reg_temp-3}, r{reg_temp-1}")
+                assembly.append("    breq div_fim") 
+                assembly.append("    brlo div_fim")
+                assembly.append(f"    sub r{reg_temp-4}, r{reg_temp-2}")  # Evita divisão por zero
+                assembly.append(f"    sbc r{reg_temp-3}, r{reg_temp-1}")
+                assembly.append("    adiw r24, 1")  # r24 pra qociente += 1
+                assembly.append("    rjmp div_loop")
+                assembly.append("div_fim:")
+                assembly.append(f"    movw r24, r{reg_temp-4}")  # Resultado em r24:r25
+            elif token == '%': # parecido com divisão, mas resultado é o resto
+                assembly.append("mod_loop:")
+                assembly.append(f"    cp r{reg_temp-4}, r{reg_temp-2}")  # Compara A com B
+                assembly.append(f"    cpc r{reg_temp-3}, r{reg_temp-1}")
+                assembly.append("    breq mod_fim")
+                assembly.append("    brlo mod_fim") 
+                assembly.append(f"    sub r{reg_temp-4}, r{reg_temp-2}")  # Evita divisão por zero
+                assembly.append(f"    sbc r{reg_temp-3}, r{reg_temp-1}")
+                assembly.append("    adiw r24, 1")  # r24 pra qociente += 1
+                assembly.append("    rjmp mod_loop")
+                assembly.append("mod_fim:")
+                assembly.append(f"    movw r24, r{reg_temp-4}") # Move resultado para r24:r25
             elif token == '^':
-                pow_16(a, b)
-            stack.append(a)  # Result in r22:r23
+                assembly.append("power_loop:")
+                assembly.append(f"    tst r{reg_temp-2}") # Testa se B é zero
+                assembly.append("    brne do_mul_check") 
+                assembly.append(f"    tst r{reg_temp-1}")
+                assembly.append("    brne do_mul_check") 
+                assembly.append("    rjmp power_end")  
+                assembly.append("do_mul_check:")
+                assembly.append(f"    mov r18, r{reg_temp-4}")  # Multiplicando em r18:r19
+                assembly.append(f"    mov r19, r{reg_temp-3}")
+                assembly.append(f"    mov r20, r{reg_temp-2}")  # Multiplicador em r20:r21
+                assembly.append(f"    mov r21, r{reg_temp-1}")
+                assembly.append("    mul r18, r21")  # a_low * b_low
+                assembly.append("    mov r22, r0")   # Armazena o resultado parcial
+                assembly.append("    mov r23, r1")
+                assembly.append("    mul r19, r20") # a_high * b_low (<<8)
+                assembly.append("    add r23, r0")  # Adiciona ao resultado parcial
+                assembly.append("    mul r18, r20") # a_low * b_high (<<8)
+                assembly.append("    add r23, r0")  # Adiciona ao resultado parcial
+                assembly.append("    clr r0")      # Limpa registrador temporário
+                assembly.append(f"    sbiw r24, 1") # Decrementa B
+                assembly.append("    rjmp power_loop")
+                assembly.append("power_end:")
+                assembly.append(f"    movw r24, r{reg_temp-2}")  # Move resultado para r24:r25
+            stack.append(["r24", "r25"])
         else:
             pass  # Ignore other tokens (e.g., parentheses)
 
@@ -341,7 +370,7 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
 # analisadorLexico.
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-       print("Uso: python script.py <nome_do_arquivo>")
+        print("Uso: python script.py <nome_do_arquivo>")
     else:
         temp_count = 0
         linhas = []
