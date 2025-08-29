@@ -39,4 +39,5 @@ Aluno 4 (exibirResultados) - Ana Maria;
 1 - clonar o Github para o ambiente do VS Code
 2 - rodar "python trabalho.py nome_arquivo.txt"  
 3 - dar upload pelo PlatformIO  
+4 - abrir o monitor serial (Ctrl + Alt + s ou símbolo de tomada na parte inferior da tela)
 ```
