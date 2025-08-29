@@ -362,9 +362,62 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
             stack.append(["r24", "r25"])
         else:
             pass  # Ignore other tokens (e.g., parentheses)
+        assembly.append("rcall print_hex16") # Imprime resultado em hexadecimal
+        assembly.append("ldi r24, 0x0A")      # Imprime nova linha
+        assembly.append("rcall usart_transmit")
 
     # Retorna o valor atualizado de temp_count
     return temp_count
+
+def usart_init(assembly):
+    assembly.append("usart_init:")
+    assembly.append("ldi r16, UBRRval >> 8") # Configura baud rate
+    assembly.append("sts UBRR0H, r16")
+    assembly.append("ldi r16, UBRRval & 0xFF")
+    assembly.append("sts UBRR0L, r16") 
+    assembly.append("ldi r16, (1<<3)") # Habilita TX (TXEN)
+    assembly.append("sts UCSR0B, r16")
+    assembly.append("ldi r16, (1<<2) | (1<<1)") # 8 bits (UCSZ01, UCSZ00)
+    assembly.append("sts UCSR0C, r16")
+    assembly.append("ret")
+
+def usart_transmit(assembly):
+    assembly.append("usart_transmit:")
+    assembly.append("    ; Transmite o byte em r24")
+    assembly.append("    lds r16, UCSR0A")  # Carrega o byte a ser enviado
+    assembly.append("    sbrs r16, 5")  # Espera até que o buffer esteja vazio
+    assembly.append("    rjmp usart_transmit")
+    assembly.append("    sts UDR0, r24")  # Envia o byte
+    assembly.append("    ret")
+
+def print_format(assembly):
+    assembly.append("print_hex16:")
+    assembly.append("    mov r18, r25")
+    assembly.append("    rcall print_hex8")
+    assembly.append("    mov r19, r24")
+    assembly.append("    rcall print_hex8")
+    assembly.append("    ret")
+    assembly.append("print_hex8:")
+    assembly.append("    mov r19, r18")
+    assembly.append("    swap r19")
+    assembly.append("    andi r19, 0x0F")
+    assembly.append("    rcall print_hex_digit")
+    assembly.append("    andi r18, 0x0F")
+    assembly.append("    rcall print_hex_digit")
+    assembly.append("    ret")
+    assembly.append("print_hex_digit:")
+    assembly.append("    cpi r18, 10")
+    assembly.append("    brlo print_hex_digit_num")
+    assembly.append("    subi r18, 10")
+    assembly.append("    ldi r24, 'A'")
+    assembly.append("    add r24, r18")
+    assembly.append("    rjmp print_hex_digit_send")
+    assembly.append("print_hex_digit_num:")
+    assembly.append("    ldi r24, '0'")
+    assembly.append("    add r24, r18")
+    assembly.append("print_hex_digit_send:")
+    assembly.append("    rcall usart_transmit")
+    assembly.append("    ret")
 
 #implementado o main que lê o arquivo_teste.txt, chama parseExpressao e depois 
 # analisadorLexico.
@@ -378,9 +431,22 @@ if __name__ == "__main__":
         resultados = []
         codigoAssembly = []
         assembly_rodata = []
-        codigoAssembly.append(".global main")
+        codigoAssembly.append(".equ Fcpu, 16000000")# Define a frequência do clock
+        codigoAssembly.append(".equ BAUD, 9600")    # Define a taxa de
+        codigoAssembly.append(".equ UBRRval, 103")  # valor do UBRR calculado Fcpu/(16*BAUD)-1
+        codigoAssembly.append(".equ UDR0, 0xC6")    # definindo os registradores
+        codigoAssembly.append(".equ UBRR0H, 0xC5") 
+        codigoAssembly.append(".equ UBRR0L, 0xC4")
+        codigoAssembly.append(".equ UCSR0B, 0xC1")
+        codigoAssembly.append(".equ UCSR0C, 0xC2")
+        codigoAssembly.append(".equ UCSR0A, 0xC0")
         codigoAssembly.append(".text")
+        codigoAssembly.append(".global main")
+        usart_init(codigoAssembly) # Inicializa rotina de USART
+        usart_transmit(codigoAssembly)
+        print_format(codigoAssembly)
         codigoAssembly.append("main:")
+        codigoAssembly.append("    rcall usart_init")  # Inicializa USART
         caminho = sys.argv[1]
         lerArquivo(caminho, linhas)
         for linha in linhas:
@@ -406,7 +472,5 @@ if __name__ == "__main__":
 
         # grava tudo no final em um arquivo
         with open("./src/saida.S", "w") as f: # cria arquivo no src
-            f.write(".section .rodata\n")
             f.write("\n".join(assembly_rodata) + "\n")
-            f.write(".text\n.global main\n")
             f.write("\n".join(codigoAssembly))
