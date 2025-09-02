@@ -232,29 +232,27 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
         except ValueError:
             return ValueError(f"Token inválido: {val}")
 
-        # Handle special cases
-        if fval == 0.0:
-            word_val = 0x0000  # Zero
-        elif math.isinf(fval):
-            word_val = 0x7C00 if fval > 0 else 0xFC00  # Infinity (+/-)
-        elif math.isnan(fval):
-            word_val = 0x7E00  # NaN
+        if fval == 0.0: # se for zero
+            word_val = 0x0000
+        elif math.isinf(fval): # se for infinito (+/-)
+            word_val = 0x7C00 if fval > 0 else 0xFC00
+        elif math.isnan(fval): # se for NaN
+            word_val = 0x7E00  
         else:
             sign = 0 if fval >= 0 else 1
             fval = abs(fval)
             if fval == 0:
                 word_val = 0
             else:
-                # Extract exponent and mantissa
-                exponent = math.floor(math.log2(fval)) if fval != 0 else 0
-                mantissa = fval / (2 ** exponent) - 1.0  # Get fractional part
+                exponent = math.floor(math.log2(fval)) if fval != 0 else 0 # escala do número (potência de 2)
+                mantissa = fval / (2 ** exponent) - 1.0  # pega parte fracionária
                 biased_exponent = exponent + 15  # Bias = 15
                 if biased_exponent <= 0:  # Denormal
-                    mantissa = fval / (2 ** -14)  # Adjust for denormal
+                    mantissa = fval / (2 ** -14)  # ajusta para denormal
                     biased_exponent = 0
-                elif biased_exponent >= 31:  # Infinity
+                elif biased_exponent >= 31:  # infinito
                     return 0x7C00 if sign == 0 else 0xFC00
-                mantissa_bits = int(mantissa * (2 ** 10)) & 0x3FF  # 10-bit mantissa
+                mantissa_bits = int(mantissa * (2 ** 10)) & 0x3FF  # manter mantissa de 10-bit
                 word_val = (sign << 15) | (biased_exponent << 10) | mantissa_bits
 
         label = f"flt{temp_count}"
@@ -303,12 +301,12 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
                 assembly.append(f"mov r19, r{reg_temp-3}")
                 assembly.append(f"mov r20, r{reg_temp-2}")  # Multiplicador em r20:r21
                 assembly.append(f"mov r21, r{reg_temp-1}")
-                assembly.append("mul r18, r21")  # a_low * b_low
+                assembly.append("mul r18, r21")  # a_baixo * b_baixo
                 assembly.append("mov r22, r0")   # Armazena o resultado parcial
                 assembly.append("mov r23, r1")
-                assembly.append("mul r19, r20") # a_high * b_low (<<8)
+                assembly.append("mul r19, r20") # a_alto * b_baixo (<<8)
                 assembly.append("add r23, r0")  # Adiciona ao resultado parcial
-                assembly.append("mul r18, r20") # a_low * b_high (<<8)
+                assembly.append("mul r18, r20") # a_alto * b_alto (<<8)
                 assembly.append("add r23, r0")  # Adiciona ao resultado parcial
                 assembly.append("clr r0")      # Limpa registrador temporário
             elif token == '/':
@@ -347,12 +345,12 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
                 assembly.append(f"    mov r19, r{reg_temp-3}")
                 assembly.append(f"    mov r20, r{reg_temp-2}")  # Multiplicador em r20:r21
                 assembly.append(f"    mov r21, r{reg_temp-1}")
-                assembly.append("    mul r18, r21")  # a_low * b_low
+                assembly.append("    mul r18, r21")  # a_baixo * b_baixo
                 assembly.append("    mov r22, r0")   # Armazena o resultado parcial
                 assembly.append("    mov r23, r1")
-                assembly.append("    mul r19, r20") # a_high * b_low (<<8)
+                assembly.append("    mul r19, r20") # a_alto * b_baixo (<<8)
                 assembly.append("    add r23, r0")  # Adiciona ao resultado parcial
-                assembly.append("    mul r18, r20") # a_low * b_high (<<8)
+                assembly.append("    mul r18, r20") # a_baixo * b_alto (<<8)
                 assembly.append("    add r23, r0")  # Adiciona ao resultado parcial
                 assembly.append("    clr r0")      # Limpa registrador temporário
                 assembly.append(f"    sbiw r24, 1") # Decrementa B
@@ -361,7 +359,8 @@ def gerarAssembly(tokens, assembly, assembly_rodata, temp_count):
                 assembly.append(f"    movw r24, r{reg_temp-2}")  # Move resultado para r24:r25
             stack.append(["r24", "r25"])
         else:
-            pass  # Ignore other tokens (e.g., parentheses)
+            pass  # Ignora outros tokens, tipo parenteses
+        
         assembly.append("rcall print_hex16") # Imprime resultado em hexadecimal
         assembly.append("ldi r24, 0x0A")      # Imprime nova linha
         assembly.append("rcall usart_transmit")
